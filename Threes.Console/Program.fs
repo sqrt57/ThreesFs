@@ -2,10 +2,12 @@ open System
 
 [<AutoOpen>]
 module GameTypes =
-    [<RequireQualifiedAccess>]
+    [<RequireQualifiedAccess; Struct>]
     type Cell =
         | Empty
-        | Three
+        | One
+        | Two
+        | Three of int
 
     type Field = Cell array array
 
@@ -24,20 +26,20 @@ module Game =
 
     let private copyField field = [| for col in field -> Array.copy col |]
 
-    let newGame (random: Random) numThrees =
+    let newGame (random: Random) numOnes numTwos numThrees =
         let field = emptyField()
-        let rec addThree num =
-            if num > 0 then
-                let x = random.Next width
-                let y = random.Next height
-                if field.[x].[y] = Cell.Empty then
-                    field.[x].[y] <- Cell.Three
-                    addThree (num - 1)
-                else
-                    addThree num
+
+        let rec putCell c =
+            let x = random.Next width
+            let y = random.Next height
+            if field.[x].[y] = Cell.Empty then
+                field.[x].[y] <- c
             else
-                ()
-        addThree numThrees
+                putCell c
+        for _ in 1..numOnes do putCell Cell.One
+        for _ in 1..numTwos do putCell Cell.Two
+        for _ in 1..numThrees do putCell <| Cell.Three 0
+
         Game field
 
     let private moveSeq move =
@@ -54,7 +56,10 @@ module Game =
             let newSource, newTarget =
                 match source, target with
                 | s, Cell.Empty -> Cell.Empty, s
-                | s, Cell.Three -> s, Cell.Three
+                | Cell.One, Cell.Two -> Cell.Empty, Cell.Three 0
+                | Cell.Two, Cell.One -> Cell.Empty, Cell.Three 0
+                | Cell.Three n1, Cell.Three n2 when n1 = n2 -> Cell.Empty, Cell.Three <| n1 + 1
+                | s, t -> s, t
             newField.[fromX].[fromY] <- newSource
             newField.[toX].[toY] <- newTarget
         Game newField
@@ -64,17 +69,31 @@ module Print =
 
     let private cellToStr cell =
         match cell with
-        | Cell.Empty -> " "
-        | Cell.Three -> "3"
+        | Cell.Empty -> "     "
+        | Cell.One -> "  1  "
+        | Cell.Two -> "  2  "
+        | Cell.Three 0 -> "  3  "
+        | Cell.Three 1 -> "  6  "
+        | Cell.Three 2 -> " 12  "
+        | Cell.Three 3 -> " 24  "
+        | Cell.Three 4 -> " 48  "
+        | Cell.Three 5 -> " 96  "
+        | Cell.Three 6 -> " 192 "
+        | Cell.Three 7 -> " 384 "
+        | Cell.Three 8 -> " 768 "
+        | Cell.Three 9 -> "1536 "
+        | Cell.Three 10 -> "3072 "
+        | Cell.Three 11 -> "6144 "
+        | Cell.Three _ -> " INF "
 
     let private printHorizontalDelimiter() =
-        for i in 0 .. width-1 do
-            printf "+---"
+        for _ in 0 .. width-1 do
+            printf "+-----"
         printfn "+"
 
     let private printRow (field: Field) n =
         for i in 0 .. width-1 do
-            printf "| %s " (cellToStr field.[i].[n])
+            printf "|%s" (cellToStr field.[i].[n])
         printfn "|"
 
     let printGame (Game field) =
@@ -104,6 +123,6 @@ let main argv =
         | _ -> nextMove game
 
     let random = Random()
-    let initital = newGame random 10
+    let initital = newGame random 8 8 6
     nextMove initital
     0
