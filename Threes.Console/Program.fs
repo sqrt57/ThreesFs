@@ -11,16 +11,18 @@ module GameTypes =
 
     type Game = Game of Field
 
-    let width = 6
-    let height = 4
+    let width = 8
+    let height = 8
 
     type Move = Up | Down | Left | Right
 
 [<AutoOpen>]
 module Game =
-    let private createField value = [| for col in 0 .. width-1 -> Array.create height value |]
+    let private createField value = [| for _ in 0 .. width-1 -> Array.create height value |]
 
     let private emptyField() = createField Cell.Empty
+
+    let private copyField field = [| for col in field -> Array.copy col |]
 
     let newGame (random: Random) numThrees =
         let field = emptyField()
@@ -38,32 +40,23 @@ module Game =
         addThree numThrees
         Game field
 
-    let private isBlockeByWallGetter move =
+    let private moveSeq move =
         match move with
-        | Up -> fun (x, y) -> y = 0
-        | Down -> fun (x, y) -> y = height-1
-        | Left -> fun (x, y) -> x = 0
-        | Right -> fun (x, y) -> x = width-1
-
-    let private moveSourceGetter move =
-        match move with
-        | Up -> fun (x, y) -> if y < height-1 then Some (x, y+1) else None
-        | Down -> fun (x, y) -> if y > 0 then Some (x, y-1) else None
-        | Left -> fun (x, y) -> if x < width-1 then Some (x+1, y) else None
-        | Right -> fun (x, y) -> if x > 0 then Some (x-1, y) else None
+        | Up -> seq { for x in 0 .. width-1 do for y in 0 .. height-2 -> (x, y + 1), (x, y) }
+        | Down -> seq { for x in 0 .. width-1 do for y in height-1 .. -1 .. 1 -> (x, y - 1), (x, y) }
+        | Left -> seq { for x in 0 .. width-2 do for y in 0 .. height-1 -> (x + 1, y), (x, y) }
+        | Right -> seq { for x in width-1 .. -1 .. 1 do for y in 0 .. height-1 -> (x - 1, y), (x, y) }
 
     let makeMove move (Game field) =
-        let newField = emptyField()
-        let isBlockeByWall = isBlockeByWallGetter move
-        let moveSource = moveSourceGetter move
-        for x in 0 .. width-1 do
-            for y in 0 .. height-1 do
-                if isBlockeByWall (x, y) && field.[x].[y] = Cell.Three then
-                    newField.[x].[y] <- field.[x].[y]
-                else
-                    match moveSource (x, y) with
-                    | Some (sx, sy) -> newField.[x].[y] <- field.[sx].[sy]
-                    | None -> newField.[x].[y] <- Cell.Empty
+        let newField = copyField field
+        for (fromX, fromY), (toX, toY) in moveSeq move do
+            let source, target = newField.[fromX].[fromY], newField.[toX].[toY]
+            let newSource, newTarget =
+                match source, target with
+                | s, Cell.Empty -> Cell.Empty, s
+                | s, Cell.Three -> s, Cell.Three
+            newField.[fromX].[fromY] <- newSource
+            newField.[toX].[toY] <- newTarget
         Game newField
 
 [<AutoOpen>]
@@ -111,6 +104,6 @@ let main argv =
         | _ -> nextMove game
 
     let random = Random()
-    let initital = newGame random 3
+    let initital = newGame random 10
     nextMove initital
     0
