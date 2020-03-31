@@ -1,4 +1,4 @@
-﻿open System
+open System
 
 [<AutoOpen>]
 module GameTypes =
@@ -18,15 +18,24 @@ module GameTypes =
 
 [<AutoOpen>]
 module Game =
-    let private emptyField = Array.create width <| Array.create height Cell.Empty
+    let private createField value = [| for col in 0 .. width-1 -> Array.create height value |]
 
-    let private copyField field = [| for col in field -> Array.copy col |]
+    let private emptyField() = createField Cell.Empty
 
-    let newGame (random: Random) =
-        let field = copyField emptyField
-        let x = random.Next width
-        let y = random.Next height
-        field.[x].[y] <- Cell.Three
+    let newGame (random: Random) numThrees =
+        let field = emptyField()
+        let rec addThree num =
+            if num > 0 then
+                let x = random.Next width
+                let y = random.Next height
+                if field.[x].[y] = Cell.Empty then
+                    field.[x].[y] <- Cell.Three
+                    addThree (num - 1)
+                else
+                    addThree num
+            else
+                ()
+        addThree numThrees
         Game field
 
     let private isBlockeByWallGetter move =
@@ -44,7 +53,7 @@ module Game =
         | Right -> fun (x, y) -> if x > 0 then Some (x-1, y) else None
 
     let makeMove move (Game field) =
-        let newField = copyField emptyField
+        let newField = emptyField()
         let isBlockeByWall = isBlockeByWallGetter move
         let moveSource = moveSourceGetter move
         for x in 0 .. width-1 do
@@ -102,6 +111,6 @@ let main argv =
         | _ -> nextMove game
 
     let random = Random()
-    let initital = newGame random
+    let initital = newGame random 3
     nextMove initital
     0
